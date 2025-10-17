@@ -3,15 +3,16 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ENV_FILE="${ENV_FILE:-${SCRIPT_DIR}/.env}"
-DB_HOST="localhost"
-DB_PORT="3306"
+DB_HOST=""
+DB_PORT=""
 DB_USER=""
 DB_PASSWORD=""
 DB_NAME=""
+MYSQL_ENV=""
 
 usage() {
   cat <<USAGE
-Usage: ${0##*/} --user <user> --password <password> --database <name> [--host <host>] [--port <port>] [--env <path>]
+Usage: ${0##*/} --user <user> --password <password> --database <name> [--host <host>] [--port <port>] [--env <path>] [--mysql-env <path>]
 USAGE
 }
 
@@ -41,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ENV_FILE="$2"
       shift 2
       ;;
+    --mysql-env)
+      MYSQL_ENV="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -52,6 +57,31 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ -n "${MYSQL_ENV}" ]]; then
+  if [[ ! -f "${MYSQL_ENV}" ]]; then
+    echo "MySQL env file not found: ${MYSQL_ENV}" >&2
+    exit 1
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  source "${MYSQL_ENV}"
+  set +a
+  DB_USER=${DB_USER:-${MYSQL_USER:-${MYSQL_USERNAME:-}}}
+  DB_PASSWORD=${DB_PASSWORD:-${MYSQL_PASSWORD:-${MYSQL_PASS:-}}}
+  DB_NAME=${DB_NAME:-${MYSQL_DATABASE:-${MYSQL_DB:-}}}
+  DEFAULT_HOST=${MYSQL_HOST:-${MYSQL_SERVER:-localhost}}
+  DEFAULT_PORT=${MYSQL_PORT:-3306}
+  DB_HOST=${DB_HOST:-${DEFAULT_HOST}}
+  DB_PORT=${DB_PORT:-${DEFAULT_PORT}}
+  if [[ -z "${DB_USER}" || -z "${DB_PASSWORD}" || -z "${DB_NAME}" ]]; then
+    echo "Credentials file did not include MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE." >&2
+    exit 1
+  fi
+fi
+
+DB_HOST=${DB_HOST:-localhost}
+DB_PORT=${DB_PORT:-3306}
 
 if [[ -z "${DB_USER}" || -z "${DB_PASSWORD}" || -z "${DB_NAME}" ]]; then
   echo "Missing required database credentials." >&2

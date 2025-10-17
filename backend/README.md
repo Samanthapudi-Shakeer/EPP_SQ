@@ -10,7 +10,7 @@ This backend directory contains automation scripts for migrating the existing `a
 
 ## 1. Install and Configure MySQL
 
-Run the provisioning script to install MySQL, start the service, and create a dedicated database/user:
+Run the provisioning script to install MySQL, start the service, and create a dedicated database/user. The script also writes a `mysql_credentials.env` file in this directory that captures the generated credentials and the ready-to-use SQLAlchemy `DATABASE_URL`.
 
 ```bash
 cd backend
@@ -18,7 +18,7 @@ chmod +x scripts/install_mysql.sh
 sudo ./scripts/install_mysql.sh
 ```
 
-The script outputs the generated credentials and stores them in `mysql_credentials.env` inside this directory.
+The script outputs the generated credentials and stores them in `mysql_credentials.env` inside this directory. Keep this file safe—it is read by the migration, verification, and switch scripts in later steps.
 
 ## 2. Configure Python Dependencies
 
@@ -38,9 +38,7 @@ Use the Python migration utility to copy schema and data from SQLite to MySQL. T
 ```bash
 cd backend
 source .venv/bin/activate
-python migrate_sqlite_to_mysql.py \
-  --sqlite-path app.db \
-  --mysql-env mysql_credentials.env
+python migrate_sqlite_to_mysql.py app.db --mysql-env mysql_credentials.env
 ```
 
 The script introspects the SQLite schema, recreates tables in MySQL, and preserves primary/foreign keys while batching inserts for efficiency.
@@ -52,9 +50,7 @@ After the migration completes, validate that every table has the same number of 
 ```bash
 cd backend
 source .venv/bin/activate
-python verify_migration_counts.py \
-  --sqlite-path app.db \
-  --mysql-env mysql_credentials.env
+python verify_migration_counts.py app.db --mysql-env mysql_credentials.env
 ```
 
 The verification script prints a per-table comparison and exits with a non-zero status if discrepancies are detected.
@@ -63,20 +59,16 @@ The verification script prints a per-table comparison and exits with a non-zero 
 
 Once the data is verified, switch the application to use the new MySQL database:
 
-1. Duplicate the template and fill in the credentials from `mysql_credentials.env`:
-   ```bash
-   cp .env.mysql.example .env
-   # edit .env to set DATABASE_URL="mysql+aiomysql://<USER>:<PASSWORD>@<HOST>:3306/<DB_NAME>"
-   ```
-2. Run the post-migration switch script to disable SQLite usage and ensure the start script uses MySQL:
+1. Run the post-migration switch script to disable SQLite usage, create/update `.env`, and ensure the start script uses MySQL credentials from `mysql_credentials.env`:
    ```bash
    chmod +x post_migration_switch.sh start.sh
-   ./post_migration_switch.sh --env-file .env
+   ./post_migration_switch.sh --mysql-env mysql_credentials.env
    ```
+   The script writes `.env` with the `DATABASE_URL` from the credentials file and regenerates `start.sh` so it refuses to start when SQLite is configured.
 
 ## 6. Start the Application
 
-Use the updated start script to launch the backend with the MySQL connection:
+Use the updated start script to launch the backend with the MySQL connection (it automatically loads `.env`):
 
 ```bash
 cd backend
