@@ -1,5 +1,6 @@
 annotated-types==0.7.0
 anyio==4.11.0
+aiomysql==0.2.0
 
 black==25.9.0
 boto3==1.40.41
@@ -13,6 +14,7 @@ dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
 fastapi==0.110.1
+SQLAlchemy==2.0.36
 flake8==7.3.0
 h11==0.16.0
 idna==3.10
